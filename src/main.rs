@@ -31,7 +31,7 @@ fn main() {
             msg_iov: std::ptr::null_mut(),
             msg_iovlen: 0,
             msg_control: cmsg_buffer as *mut libc::c_void,
-            msg_controllen: len,
+            msg_controllen: len as MsgControlLen,
             msg_flags: 0,
         };
 
@@ -96,7 +96,7 @@ fn receive_fd(socket: i32) {
             msg_iov: std::ptr::null_mut(),
             msg_iovlen: 0,
             msg_control: cmsg_buffer as *mut libc::c_void,
-            msg_controllen: CMSG_SPACE(cmsg_length),
+            msg_controllen: CMSG_SPACE(cmsg_length) as MsgControlLen,
             msg_flags: 0,
         };
 
@@ -142,4 +142,4 @@ unsafe fn CMSG_DATA(cmsg: *mut cmsghdr) -> *mut c_void {
 type MsgControlLen = size_t;
 
 #[cfg(not(target_env = "gnu"))]
-type MsgControlLen = socklen_t;
+type MsgControlLen = libc::socklen_t;
