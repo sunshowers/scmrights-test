@@ -52,6 +52,17 @@ fn main() {
         }
     }
 
+    // Send a message to the other process.
+    let message = "Hello, world!";
+    unsafe {
+        if libc::send(sender2, message.as_ptr() as *const c_void, message.len(), 0) < 0 {
+            panic!(
+                "Failed to send message: {}",
+                std::io::Error::last_os_error()
+            );
+        }
+    }
+
     handle.join().unwrap();
 }
 
@@ -128,7 +139,17 @@ fn receive_fd(socket: i32) {
         println!("Received fd: {:?}", msg);
 
         let cmsg_fds = CMSG_DATA(cmsg_buffer) as *const c_int;
-        println!("Received fd: {}", *cmsg_fds);
+        let fd = *cmsg_fds;
+        println!("Received fd: {}", fd);
+
+        // Receive the message.
+        let mut buffer = [0u8; 1024];
+        let res = libc::recv(fd, buffer.as_mut_ptr() as *mut c_void, buffer.len(), 0);
+
+        println!(
+            "Received message: {:?}",
+            std::str::from_utf8(&buffer[..res as usize])
+        );
     }
 }
 
