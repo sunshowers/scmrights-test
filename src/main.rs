@@ -97,11 +97,18 @@ fn receive_fd(socket: i32) {
     unsafe {
         let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length)) as *mut cmsghdr;
 
+        let mut len = 0usize;
+
+        let mut iov = libc::iovec {
+            iov_base: &mut len as *mut _ as *mut c_void,
+            iov_len: mem::size_of_val(&len),
+        };
+
         let mut msg = libc::msghdr {
             msg_name: std::ptr::null_mut(),
             msg_namelen: 0,
-            msg_iov: std::ptr::null_mut(),
-            msg_iovlen: 0,
+            msg_iov: &mut iov,
+            msg_iovlen: 1,
             msg_control: cmsg_buffer as *mut libc::c_void,
             msg_controllen: CMSG_SPACE(cmsg_length) as MsgControlLen,
             msg_flags: 0,
@@ -144,12 +151,6 @@ fn CMSG_LEN(length: size_t) -> size_t {
 unsafe fn CMSG_DATA(cmsg: *mut cmsghdr) -> *mut c_void {
     (cmsg as *mut libc::c_uchar).add(CMSG_ALIGN(mem::size_of::<cmsghdr>())) as *mut c_void
 }
-
-#[cfg(target_env = "gnu")]
-type MsgIovLen = size_t;
-
-#[cfg(not(target_env = "gnu"))]
-type MsgIovLen = libc::c_int;
 
 #[cfg(target_env = "gnu")]
 type MsgControlLen = size_t;
