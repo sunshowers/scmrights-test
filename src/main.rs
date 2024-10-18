@@ -1,7 +1,9 @@
 // Sorry about the sheer lack of error handling.
 
-use libc::{c_int, cmsghdr, size_t, AF_UNIX, SOCK_CLOEXEC, SOCK_SEQPACKET};
-use std::{mem, os::raw::c_void};
+use libc::{
+    c_int, cmsghdr, size_t, AF_UNIX, CMSG_DATA, CMSG_LEN, CMSG_SPACE, SOCK_CLOEXEC, SOCK_SEQPACKET,
+};
+use std::{ffi::c_uint, mem, os::raw::c_void};
 
 fn main() {
     let (sender1, receiver1) = make_socketpair();
@@ -17,12 +19,6 @@ fn main() {
 
     // Send receiver2 to the other process.
     unsafe {
-        let cmsg_length = std::mem::size_of::<c_int>();
-        let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length)) as *mut cmsghdr;
-        if cmsg_buffer.is_null() {
-            panic!("Failed to allocate memory for cmsg_buffer");
-        }
-
         let (cmsg_buffer, len) = make_cmsghdr(receiver2);
         println!("cmsg buffer: {:?}, len: {}", cmsg_buffer, len);
 
@@ -90,11 +86,11 @@ fn make_socketpair() -> (c_int, c_int) {
     (results[0], results[1])
 }
 
-fn make_cmsghdr(fd: i32) -> (*mut cmsghdr, size_t) {
+fn make_cmsghdr(fd: i32) -> (*mut cmsghdr, c_uint) {
     // Send 1 fd over.
-    let cmsg_length = mem::size_of::<i32>();
+    let cmsg_length = mem::size_of::<c_int>() as c_uint;
     unsafe {
-        let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length)) as *mut cmsghdr;
+        let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length) as usize) as *mut cmsghdr;
         if cmsg_buffer.is_null() {
             panic!("Failed to allocate memory for cmsg_buffer");
         }
@@ -111,10 +107,10 @@ fn make_cmsghdr(fd: i32) -> (*mut cmsghdr, size_t) {
 
 fn receive_fd(socket: i32) {
     // Receive the file descriptor.
-    let cmsg_length = mem::size_of::<c_int>();
+    let cmsg_length = mem::size_of::<c_int>() as c_uint;
 
     unsafe {
-        let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length)) as *mut cmsghdr;
+        let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length) as usize) as *mut cmsghdr;
 
         let mut len = 0usize;
         let mut data_buffer = [0u8; 1024];
@@ -166,26 +162,6 @@ fn receive_fd(socket: i32) {
             std::str::from_utf8(&buffer[..res as usize])
         );
     }
-}
-
-#[allow(non_snake_case)]
-fn CMSG_ALIGN(length: size_t) -> size_t {
-    (length + mem::size_of::<size_t>() - 1) & !(mem::size_of::<size_t>() - 1)
-}
-
-#[allow(non_snake_case)]
-fn CMSG_SPACE(length: size_t) -> size_t {
-    CMSG_ALIGN(length) + CMSG_ALIGN(mem::size_of::<cmsghdr>())
-}
-
-#[allow(non_snake_case)]
-fn CMSG_LEN(length: size_t) -> size_t {
-    CMSG_ALIGN(mem::size_of::<cmsghdr>()) + length
-}
-
-#[allow(non_snake_case)]
-unsafe fn CMSG_DATA(cmsg: *mut cmsghdr) -> *mut c_void {
-    (cmsg as *mut libc::c_uchar).add(CMSG_ALIGN(mem::size_of::<cmsghdr>())) as *mut c_void
 }
 
 #[cfg(target_env = "gnu")]
