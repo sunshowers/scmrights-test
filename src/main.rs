@@ -26,17 +26,25 @@ fn main() {
         let (cmsg_buffer, len) = make_cmsghdr(receiver2);
         println!("cmsg buffer: {:?}, len: {}", cmsg_buffer, len);
 
-        // This isn't required on Linux but maybe is on illumos?
-        let mut iov = libc::iovec {
-            iov_base: &len as *const _ as *mut c_void,
-            iov_len: mem::size_of_val(&len),
-        };
+        let data_buffer = [0u8; 1024];
+
+        // This isn't required on Linux but is on illumos.
+        let mut iovec = [
+            libc::iovec {
+                iov_base: &len as *const _ as *mut c_void,
+                iov_len: mem::size_of_val(&len),
+            },
+            libc::iovec {
+                iov_base: data_buffer.as_ptr() as *mut c_void,
+                iov_len: data_buffer.len(),
+            },
+        ];
 
         let msg = libc::msghdr {
             msg_name: std::ptr::null_mut(),
             msg_namelen: 0,
-            msg_iov: &mut iov as *mut libc::iovec,
-            msg_iovlen: 1,
+            msg_iov: iovec.as_mut_ptr(),
+            msg_iovlen: 2,
             msg_control: cmsg_buffer as *mut libc::c_void,
             msg_controllen: len as MsgControlLen,
             msg_flags: 0,
@@ -109,17 +117,24 @@ fn receive_fd(socket: i32) {
         let cmsg_buffer = libc::malloc(CMSG_SPACE(cmsg_length)) as *mut cmsghdr;
 
         let mut len = 0usize;
+        let mut data_buffer = [0u8; 1024];
 
-        let mut iov = libc::iovec {
-            iov_base: &mut len as *mut _ as *mut c_void,
-            iov_len: mem::size_of_val(&len),
-        };
+        let mut iovec = [
+            libc::iovec {
+                iov_base: &mut len as *mut _ as *mut c_void,
+                iov_len: mem::size_of_val(&len),
+            },
+            libc::iovec {
+                iov_base: data_buffer.as_mut_ptr() as *mut c_void,
+                iov_len: data_buffer.len(),
+            },
+        ];
 
         let mut msg = libc::msghdr {
             msg_name: std::ptr::null_mut(),
             msg_namelen: 0,
-            msg_iov: &mut iov,
-            msg_iovlen: 1,
+            msg_iov: iovec.as_mut_ptr(),
+            msg_iovlen: 2,
             msg_control: cmsg_buffer as *mut libc::c_void,
             msg_controllen: CMSG_SPACE(cmsg_length) as MsgControlLen,
             msg_flags: 0,
